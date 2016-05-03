@@ -1,8 +1,8 @@
 # pySRD9c
 
-A Python test application for the Renovatio SRD-9c display
+A Python test application for the Renovatio SRD-9c display (http://www.renovatio-dev.com/).
 
-This small application makes use of the pywinusb module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses he HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
+This small application makes use of the pywinusb module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses the HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
 
 The output report is structured as follows (41 bytes total):
 
