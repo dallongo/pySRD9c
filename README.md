@@ -19,6 +19,12 @@ It demonstrates custom mapping of RPM LEDs for use as push-to-pass/drs indicator
 It also features live lap timing, lap split time, field position, and lap progession during a race.
 
 ### Releases
+#### 2016-05-05
+
+* Added sector split times
+* Lap and sector splits now compared to previous lap (and proper handling of invalid laps)
+* Fix improper display of session time/laps remaining
+
 #### 2016-05-04
 
 * Refactor `pySRD9c.py` and add testing loop as self test method

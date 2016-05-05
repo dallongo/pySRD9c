@@ -14,6 +14,9 @@ The psutil module is required and being used to detect if the R3E
 process is running.
 
 Release History:
+2016-05-05: Added sector split times
+	All split times now compared to previous lap, properly handle invalid laps
+	Fixed race session time/laps remaining
 2016-05-04: Updated per https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs
 	Added blinking effect for critical warnings and DRS/PTP/pit events
 	Added lap/split display
@@ -339,6 +342,10 @@ if __name__ == '__main__':
 	dash.self_test()
 	blink_duration = 0.5
 	blink_last = 0
+	previous_lap = None
+	sector_split_duration = 3
+	sector_split_last = 0
+	sector_split_sector = 0
 	print "Connected!"
 	print "Waiting for shared memory map..."
 	while(not smm_handle):
@@ -376,6 +383,28 @@ if __name__ == '__main__':
 			dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
 		else:
 			dash.left = '-.--.-'
+		# split times for sectors 1 and 2
+		dd = None
+		if(smm.num_cars > 0):
+			for d in smm.all_drivers_data_1:
+				if(d.driver_info.slot_id == smm.slot_id):
+					dd = d
+					break
+			if(not dd):
+				print "Couldn't find driver data!"
+		if(dd):
+			if(dd.track_sector == 2 and dd.sector_time_previous_self[0] > 0):
+				if(sector_split_sector != 2):
+					sector_split_last = time()
+					sector_split_sector = 2
+				if(time() - sector_split_last <= sector_split_duration):
+					dash.right = '{0:04.2f}'.format(dd.sector_time_current_self[0] - dd.sector_time_previous_self[0])
+			elif(dd.track_sector == 3 and dd.sector_time_previous_self[1] > 0):
+				if(sector_split_sector != 3):
+					sector_split_last = time()
+					sector_split_sector = 3
+				if(time() - sector_split_last <= sector_split_duration):
+					dash.right = '{0:04.2f}'.format(dd.sector_time_current_self[1] - dd.sector_time_previous_self[1])
 		# blink red status LED at critical fuel level
 		if(smm.fuel_use_active == 1 and smm.fuel_capacity > 0 and smm.fuel_left/smm.fuel_capacity <= 0.1):
 			status[0] = '1'
@@ -451,21 +480,25 @@ if __name__ == '__main__':
 				dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_previous_self, 60))
 			else:
 				dash.left = '-.--.-'
-			if(smm.lap_time_best_self > 0):
-				dash.right = '{0:04.2f}'.format(smm.lap_time_previous_self - smm.lap_time_best_self)
+			if(previous_lap and smm.lap_time_previous_self > 0):
+				dash.right = '{0:04.2f}'.format(smm.lap_time_previous_self - previous_lap)
 			else:
 				dash.right = '--.--'
 		elif(smm.lap_time_current_self > 3 and smm.lap_time_current_self <= 6):
+			if(smm.lap_time_previous_self > 0):
+				previous_lap = smm.lap_time_previous_self
+			else:
+				previous_lap = None
 			dash.left = 'P{0}'.format(str(smm.position).rjust(3))
 			dash.right = ' {0}'.format(str(smm.num_cars).ljust(3))
 		elif(smm.lap_time_current_self > 6 and smm.lap_time_current_self <= 9):
 			dash.left = 'L{0}'.format(str(smm.completed_laps).rjust(3))
 			if(smm.number_of_laps > 0):
 				dash.right = ' {0}'.format(str(smm.number_of_laps).ljust(3))
-			elif(smm.session_type == r3e_session_enum.R3E_SESSION_QUALIFY):
-				dash.right = 'qual'
+			elif(smm.session_time_remaining > 0):
+				dash.right = '{0:02.0f}.{1:04.1f}'.format(*divmod(smm.session_time_remaining, 60))
 			else:
-				dash.right = 'prac'
+				dash.right = ' '*4
 		dash.status = ''.join(status)
 		# make sure engine is running
 		if(smm.engine_rps > 0):
