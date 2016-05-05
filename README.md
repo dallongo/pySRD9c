@@ -14,9 +14,17 @@ The output report is structured as follows (41 bytes total):
 * gear display: 1 byte, each bit is a single segment of the display in the standard order (1 digit)
 * padding/unknown: 29 bytes, all 0 during normal operation, setting all bytes to 0xff resets the device
 
-A sample application providing real-time telemetry data for RaceRoom Racing Experience is available in `r3e.py`.
+A sample application providing real-time telemetry data for RaceRoom Racing Experience is available in `r3e.py` and requires the psutil module (https://github.com/giampaolo/psutil).
+It demonstrates custom mapping of RPM LEDs for use as push-to-pass/drs indicators as well as warnings that blink the status LEDs during a critical state.
+It also features live lap timing, lap split time, field position, and lap progession during a race.
 
 ### Releases
+#### 2016-05-04
+
+* Refactor `pySRD9c.py` and add testing loop as self test method
+* Update `r3e.py` shared memory struct to include push-to-pass from https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs and correct an enum error
+* Add lap timing, split times, blinking status indicators, PTP/DRS meter, and text warnings such as 'fuel' for low fuel and 'heat' for overheating.
+
 #### 2016-05-04
 
 * Added `r3e.py` application for live telemetry data in RaceRoom Racing Experience

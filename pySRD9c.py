@@ -17,6 +17,7 @@ gear display: 1 byte, each bit is a single segment of the display in the standar
 padding/unknown: 29 bytes, all 0 during normal operation, setting all bytes to 0xff resets the device
 
 Release History:
+2016-05-04: Added sanity checks, helper functions, friendlier LED handling
 2016-05-02: Initial release
 """
 
@@ -65,16 +66,16 @@ class srd9c:
 	 '.':int('10000000', 2)
 	}
 
-	def __init__(self, init_left='----', init_right='----', init_gear='-'):
+	def __init__(self, init_left='-'*4, init_right='-'*4, init_gear='-', use_green=True, use_red=True, use_blue=True, use_status=False):
 		self.device = None
 		self.output_report = None
 		self.left = init_left
 		self.right = init_right
 		self.gear = init_gear
-		self.rpm = {'green':[0]*4, 'red':[0]*4, 'blue':[0]*4, 
-			'use_green':True, 'use_red':True, 'use_blue':True, 'use_status':False,
+		self.rpm = {'green':'0'*4, 'red':'0'*4, 'blue':'0'*4, 
+			'use_green':use_green, 'use_red':use_red, 'use_blue':use_blue, 'use_status':use_status,
 			'value':0}
-		self.status = [0]*4
+		self.status = '0'*4
 		while(not self.device):
 			devlist = hid.HidDeviceFilter(vendor_id = 0x04d8, product_id = 0xf667).get_devices()
 			if(devlist):
@@ -83,75 +84,38 @@ class srd9c:
 				self.output_report = self.device.find_output_reports()[0]
 			else:
 				sleep(1)
-		self.send_report()
+		self.update()
 		return
 
-	def pack_report(self):
-		while(len(self.left.replace('.', '')) > 4):
-			self.left = self.left[:-1]
-		while(len(self.left.replace('.', '')) < 4):
-			self.left = ' ' + self.left
-		while(len(self.right.replace('.', '')) > 4):
-			self.right = self.right[:-1]
-		while(len(self.right.replace('.', '')) < 4):
-			self.right = ' ' + self.right
-		while(len(self.gear.replace('.', '')) > 1):
-			self.gear = self.gear[:-1]
-		while(len(self.gear.replace('.', '')) < 1):
-			self.gear = ' ' + self.gear
-
-		left = []
-		right = []
-		gear = 0
-
-		for i in xrange(len(self.left)):
-			c = self.left[i].upper()
+	def string_to_display(self, s='-'*4, l=4):
+		o = []
+		while(len(s.replace('.', '')) > l):
+			s = s[:-1]
+		while(len(s.replace('.', '')) < l):
+			s = ' ' + s
+		for i in xrange(len(s)):
+			c = s[i].upper()
 			if c == '.':
 				continue
 			if c in self.lut:
 				c = self.lut[c]
 			else:
 				c = 0
-			if (i < len(self.left) - 1) and self.left[i + 1] == '.':
+			if (i < len(s) - 1) and s[i + 1] == '.':
 				c += self.lut['.']
-			left.append(c)
-		for i in xrange(len(self.right)):
-			c = self.right[i].upper()
-			if c == '.':
-				continue
-			if c in self.lut:
-				c = self.lut[c]
-			else:
-				c = 0
-			if (i < len(self.right) - 1) and self.right[i + 1] == '.':
-				c += self.lut['.']
-			right.append(c)
-		for i in xrange(len(self.gear)):
-			c = self.gear[i].upper()
-			if c == '.':
-				continue
-			if c in self.lut:
-				c = self.lut[c]
-			else:
-				c = 0
-			if (i < len(self.gear) - 1) and self.gear[i + 1] == '.':
-				c += self.lut['.']
-			gear = c
+			o.append(c)
+		return o
 
+	def string_to_led(self, s='0'*4):
+		return ''.join([i for i in s if i in ['0', '1']]).rjust(4, '0')[3::-1]
+
+	def calc_leds(self):
 		rpm_on = 1
-		rpm_segments = 0
+		rpm_leds = 0
 		if(self.rpm['value'] < 0):
 			rpm_on = 0
-		if(self.rpm['use_green']):
-			rpm_segments += 1
-		if(self.rpm['use_red']):
-			rpm_segments += 1
-		if(self.rpm['use_blue']):
-			rpm_segments += 1
-		if(self.rpm['use_status']):
-			rpm_segments += 1
-		rpm = [rpm_on]*(int(rpm_segments*4*abs(self.rpm['value'])))
-		rpm += [(rpm_on^1)]*(rpm_segments*4 - len(rpm))
+		rpm_leds = (int(self.rpm['use_green']) + int(self.rpm['use_red']) + int(self.rpm['use_blue']) + int(self.rpm['use_status']))*4
+		rpm = (str(rpm_on)*(int(rpm_leds*abs(self.rpm['value'])))).ljust(rpm_leds, str(rpm_on^1))
 		if(self.rpm['use_green']):
 			self.rpm['green'] = rpm[:4]
 			rpm = rpm[4:]
@@ -163,45 +127,60 @@ class srd9c:
 			rpm = rpm[4:]
 		if(self.rpm['use_status']):
 			self.status = rpm[:4]
+		return
 
-		gr = 0
-		bs = 0
-
-		for i in xrange(4):
-			gr += self.rpm['green'][i] << i
-			gr += self.rpm['red'][i] << (i + 4)
-			bs += self.rpm['blue'][i] << i
-			bs += self.status[i] << (i + 4)
-
+	def pack_report(self):
+		self.calc_leds()
 		o = [0]
-		o += left
-		o += right
-		o += [gr, bs, gear]
+		o += self.string_to_display(self.left, 4)
+		o += self.string_to_display(self.right, 4)
+		o += [int(self.string_to_led(self.rpm['red']) + self.string_to_led(self.rpm['green']), 2)]
+		o += [int(self.string_to_led(self.status) + self.string_to_led(self.rpm['blue']), 2)]
+		o += self.string_to_display(self.gear, 1)
 		o += [0]*(41 - len(o))
 		return o
 
-	def send_report(self):
+	def update(self):
 		self.output_report.send(self.pack_report())
 		return
 
+	def reset(self):
+		self.gear = '-'
+		self.left = '-'*4
+		self.right = '-'*4
+		self.rpm['value'] = 0
+		self.rpm['green'] = '0'*4
+		self.rpm['red'] = '0'*4
+		self.rpm['blue'] = '0'*4
+		self.status = '0'*4
+		self.update()
+		return
+
+	def self_test(self):
+		self.gear = '0'
+		self.left = 'self'
+		self.right = 'test'
+		self.rpm['value'] = 0
+		while(True):
+			if(self.rpm['value'] >= 1):
+				break
+			self.rpm['value'] += 0.01
+			self.update()
+			sleep(0.01)
+		self.left = 'done'
+		self.right = ' '*4
+		self.gear = ' '
+		self.update()
+		sleep(1)
+		self.reset()
+		return
+
+
 if __name__ == '__main__':
 	print "Waiting for device..."
-	test = srd9c(init_left='srd9', init_gear='c', init_right='init')
+	test = srd9c(init_left='srd9', init_gear='c', init_right='init', use_status=True)
 	print "Device found!"
 	sleep(3)
-	print "Beginning test cycle (Ctrl-C to quit)..."
-	test.gear = 'n'
-	r = 0
-	rpm = 0
-	rpm_step = 0.01
-	test.rpm['use_status'] = True
-	while(True):
-		test.left = '{:.2f}'.format(r*-1)
-		test.right = '{:.2f}'.format(r)
-		if(abs(rpm) >= 1):
-			rpm_step *= -1
-		r -= rpm_step*3
-		rpm += rpm_step
-		test.rpm['value'] = rpm
-		test.send_report()
-		sleep(0.01)
+	print "Beginning test cycle..."
+	test.self_test()
+	print "Done!"

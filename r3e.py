@@ -14,6 +14,9 @@ The psutil module is required and being used to detect if the R3E
 process is running.
 
 Release History:
+2016-05-04: Updated per https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs
+	Added blinking effect for critical warnings and DRS/PTP/pit events
+	Added lap/split display
 2016-05-04: Inital release
 """
 
@@ -38,8 +41,9 @@ class r3e_session_phase_enum(Structure):
 				('R3E_SESSION_PHASE_FORMATION', c_int),
 				('R3E_SESSION_PHASE_COUNTDOWN', c_int),
 				('R3E_SESSION_PHASE_GREEN', c_int),
-				('R3E_SESSION_PHASE_CHECKERED', c_int)]
-r3e_session_phase = r3e_session_phase_enum(-1, 1, 2, 3, 4, 5, 6)
+				('R3E_SESSION_PHASE_CHECKERED', c_int),
+				('R3E_SESSION_PHASE_TERMINATED', c_int)]
+r3e_session_phase = r3e_session_phase_enum(-1, 0, 2, 3, 4, 5, 6, 7)
 
 class r3e_control_enum(Structure):
 	_fields_ = [('R3E_CONTROL_UNAVAILABLE', c_int),
@@ -125,7 +129,7 @@ class r3e_playerdata(Structure):
 				('orientation', r3e_vec3_f64),
 				('rotation', r3e_vec3_f64),
 				('angular_acceleration', r3e_vec3_f64),
-				('reserved1', r3e_vec3_f64)]		# driver body acceleration
+				('driver_acceleration', r3e_vec3_f64)]	# m/s^2
 
 class r3e_flags(Structure):
 	_pack_ = 1
@@ -184,6 +188,14 @@ class r3e_track_info(Structure):
 	_fields_ = [('track_id', c_int),
 				('layout_id', c_int),
 				('length', c_float)]
+
+class r3e_push_to_pass(Structure):
+	_pack_ = 1
+	_fields_ = [('available', c_int),
+				('engaged', c_int),
+				('amount_left', c_int),
+				('engaged_time_left', c_float),
+				('wait_time_left', c_float)]
 
 class r3e_driver_info(Structure):
 	_pack_ = 1
@@ -266,11 +278,11 @@ class r3e_shared(Structure):
 				('session_time_remaining', c_float),# s
 				('lap_time_best_leader', c_float),	# s
 				('lap_time_best_leader_class', c_float),	# s
-				('reserved1', c_float),				# lap time delta self
+				('lap_time_delta_self', c_float),	# s
 				('lap_time_delta_leader', c_float),	# s
 				('lap_time_delta_leader_class', c_float),	# s
-				('reserved2', c_float*3),			# sector time delta self
-				('reserved3', c_float*3),			# sector time delta leader
+				('sector_time_delta_self', c_float*3),	# s
+				('sector_time_delta_leader', c_float*3),# s
 				('session_best_lap_sector_times', c_float*3),# s
 				('time_delta_front', c_float),		# s
 				('time_delta_behind', c_float),		# s
@@ -286,6 +298,7 @@ class r3e_shared(Structure):
 				('pit_limiter', c_int),
 				('wheel_speed', r3e_wheel_speed),	# rad/s
 				('track_info', r3e_track_info),
+				('push_to_pass', r3e_push_to_pass),
 				('all_drivers_data_1', r3e_driver_data_1*128)]
 
 def rps_to_rpm(r):
@@ -311,9 +324,9 @@ startup_timeout = 600
 
 if __name__ == '__main__':
 	search_start = time()
+	print "Waiting for {0}...".format(r3e_exe)
 	while(not r3e_pid):
-		sleep(1)
-		print "Waiting for {0}...".format(r3e_exe)
+		sleep(0.1)
 		if(time() - search_start >= startup_timeout):
 			print "Timeout waiting for {0} to start after {1} seconds, exiting!".format(r3e_exe, startup_timeout)
 			exit(1)
@@ -321,10 +334,15 @@ if __name__ == '__main__':
 			if(Process(p).name() == r3e_exe):
 				r3e_pid = p
 				print "Process '{0}' found!".format(r3e_exe)
+	print "Waiting for SRD-9c..."
 	dash = srd9c()
+	dash.self_test()
+	blink_duration = 0.5
+	blink_last = 0
+	print "Connected!"
+	print "Waiting for shared memory map..."
 	while(not smm_handle):
-		sleep(1)
-		print "Waiting for shared memory map..."
+		sleep(0.1)
 		try:
 			smm_handle = mmap.mmap(fileno=0, length=sizeof(r3e_shared), tagname=r3e_smm)
 		except:
@@ -334,35 +352,126 @@ if __name__ == '__main__':
 		sleep(0.01)
 		smm_handle.seek(0)
 		smm = r3e_shared.from_buffer_copy(smm_handle)
+		# use green RPM LEDs for PTP when available
+		if(smm.push_to_pass.amount_left > 0 or smm.push_to_pass.engaged > 0 or smm.drs_engaged > 0):
+			dash.rpm['use_green'] = False
+		elif(smm.push_to_pass.available < 1 and smm.push_to_pass.engaged < 1 and smm.drs_engaged < 1):
+			dash.rpm['use_green'] = True
 		rpm = 0
+		status = ['0']*4
 		if(smm.max_engine_rps > 0):
-			rpm = rps_to_rpm(smm.engine_rps)/rps_to_rpm(smm.max_engine_rps)
-		if(rpm > 0.45):
-			rpm -= 0.4
-			rpm /= 0.6
-		else:
-			rpm = 0
+			rpm = smm.engine_rps/smm.max_engine_rps
+			rpm -= (1 - (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13)
+			rpm /= (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13
+			if(rpm < 0):
+				rpm = 0
+			# blue status LED shift light at 95% of full RPM range
+			if(smm.engine_rps/smm.max_engine_rps >= 0.95):
+				status[2] = '1'
 		dash.rpm['value'] = rpm
-		dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
 		dash.gear = dict({'-2':'-', '-1':'r', '0':'n'}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
-		dash.left = 'P{0}'.format(str(smm.position).rjust(3))
-		if(smm.fuel_use_active == 1 and smm.fuel_capacity > 0 and smm.fuel_left/smm.fuel_capacity < 0.1):
-			dash.status[0] = 1
+		dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
+		# no running clock on invalid/out laps
+		if(smm.lap_time_current_self > 0):
+			dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
 		else:
-			dash.status[0] = 0
-		if(c_to_f(smm.engine_water_temp) > 235):
-			dash.status[1] = 1
-		else:
-			dash.status[1] = 0
-		if(rpm >= 0.95):
-			dash.status[2] = 1
-		else:
-			dash.status[2] = 0
+			dash.left = '-.--.-'
+		# blink red status LED at critical fuel level
+		if(smm.fuel_use_active == 1 and smm.fuel_capacity > 0 and smm.fuel_left/smm.fuel_capacity <= 0.1):
+			status[0] = '1'
+			if(smm.fuel_left/smm.fuel_capacity < 0.05):
+				if(time() - blink_last >= blink_duration*2):
+					blink_last = time()
+				if(time() - blink_last <= blink_duration):
+					status[0] = '1'
+					dash.left = 'fuel'
+				if(time() - blink_last > blink_duration):
+					status[0] = '0'
+		# blink yellow status LED at critical coolant temp
+		if(smm.engine_water_temp >= 91):
+			status[1] = '1'
+			if(smm.engine_water_temp > 93):
+				if(time() - blink_last >= blink_duration*2):
+					blink_last = time()
+				if(time() - blink_last <= blink_duration):
+					status[1] = '1'
+				if(time() - blink_last > blink_duration):
+					status[1] = '0'
+					dash.left = 'heat'
+		# blink green status LED while in pit/limiter active
 		if(smm.pit_window_status == r3e_pit_window.R3E_PIT_WINDOW_OPEN):
-			dash.status[3] = 1
+			status[3] = '1'
+		if(smm.pit_window_status == r3e_pit_window.R3E_PIT_WINDOW_STOPPED or smm.pit_limiter == 1):
+			if(time() - blink_last >= blink_duration*2):
+				blink_last = time()
+			if(time() - blink_last <= blink_duration):
+				status[3] = '1'
+			if(time() - blink_last > blink_duration):
+				status[3] = '0'
+				dash.right = 'pit '
+		# blink green RPM LED and DRS on display while DRS engaged (untested)
+		if(smm.drs_engaged == 1):
+			if(time() - blink_last >= blink_duration*2):
+				blink_last = time()
+			if(time() - blink_last <= blink_duration):
+				dash.rpm['green'] = '0110'
+				dash.left = 'drs '
+				dash.right = ' on '
+			if(time() - blink_last > blink_duration):
+				dash.rpm['green'] = '1001'
+		# blink green RPM LED during PTP cool-down, charging effect on last 4 seconds
+		if(smm.push_to_pass.amount_left > 0):
+			if(smm.push_to_pass.wait_time_left <= 4):
+				dash.rpm['green'] = ('0'*(int(smm.push_to_pass.wait_time_left))).rjust(4, '1')
+			else:
+				if(time() - blink_last >= blink_duration*2):
+					blink_last = time()
+				if(time() - blink_last <= blink_duration):
+					dash.rpm['green'] = '1000'
+				if(time() - blink_last > blink_duration):
+					dash.rpm['green'] = '0001'
+		# blink green RPM LED during PTP engaged, depleting effect on last 4 seconds
+		# blink PTP activations remaining on display while PTP engaged
+		if(smm.push_to_pass.engaged == 1):
+			if(smm.push_to_pass.engaged_time_left <= 4):
+				dash.rpm['green'] = ('1'*(int(smm.push_to_pass.engaged_time_left))).rjust(4, '0')
+			else:
+				if(time() - blink_last >= blink_duration*2):
+					blink_last = time()
+				if(time() - blink_last <= blink_duration):
+					dash.rpm['green'] = '0110'
+					dash.left = ' ptp'
+					dash.right = str(smm.push_to_pass.amount_left).ljust(4)
+				if(time() - blink_last > blink_duration):
+					dash.rpm['green'] = '1001'
+		# show lap/split times, then position in field, then number of laps
+		# last to render so that it overrides any blinking/text warnings
+		if(smm.lap_time_current_self > 0 and smm.lap_time_current_self <= 3):
+			if(smm.lap_time_previous_self > 0):
+				dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_previous_self, 60))
+			else:
+				dash.left = '-.--.-'
+			if(smm.lap_time_best_self > 0):
+				dash.right = '{0:04.2f}'.format(smm.lap_time_previous_self - smm.lap_time_best_self)
+			else:
+				dash.right = '--.--'
+		elif(smm.lap_time_current_self > 3 and smm.lap_time_current_self <= 6):
+			dash.left = 'P{0}'.format(str(smm.position).rjust(3))
+			dash.right = ' {0}'.format(str(smm.num_cars).ljust(3))
+		elif(smm.lap_time_current_self > 6 and smm.lap_time_current_self <= 9):
+			dash.left = 'L{0}'.format(str(smm.completed_laps).rjust(3))
+			if(smm.number_of_laps > 0):
+				dash.right = ' {0}'.format(str(smm.number_of_laps).ljust(3))
+			elif(smm.session_type == r3e_session_enum.R3E_SESSION_QUALIFY):
+				dash.right = 'qual'
+			else:
+				dash.right = 'prac'
+		dash.status = ''.join(status)
+		# make sure engine is running
+		if(smm.engine_rps > 0):
+			dash.update()
 		else:
-			dash.status[3] = 0
-		dash.send_report()
+			dash.reset()
 		
 	print "Closing shared memory map..."
 	smm_handle.close()
