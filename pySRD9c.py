@@ -17,6 +17,7 @@ gear display: 1 byte, each bit is a single segment of the display in the standar
 padding/unknown: 29 bytes, all 0 during normal operation, setting all bytes to 0xff resets the device
 
 Release History:
+2016-05-05: Added raw hardware tests
 2016-05-04: Added sanity checks, helper functions, friendlier LED handling
 2016-05-02: Initial release
 """
@@ -144,6 +145,21 @@ class srd9c:
 		self.output_report.send(self.pack_report())
 		return
 
+	def hw_reset(self):
+		self.output_report.send([0] + [0xff]*40)
+		self.__init__()
+		return
+
+	def hw_test(self):
+		for c in xrange(10):
+			for i in xrange(8):
+				self.output_report.send([0] + [0]*c + [(1 << i)] + [0]*(39 - c))
+				sleep(0.01)
+		self.output_report.send([0] + [0xff]*11 + [0]*29)
+		sleep(0.1)
+		self.hw_reset()
+		return
+
 	def reset(self):
 		self.gear = '-'
 		self.left = '-'*4
@@ -178,9 +194,10 @@ class srd9c:
 
 if __name__ == '__main__':
 	print "Waiting for device..."
-	test = srd9c(init_left='srd9', init_gear='c', init_right='init', use_status=True)
+	test = srd9c(init_left='srd9', init_gear='c', init_right='init')
 	print "Device found!"
 	sleep(3)
 	print "Beginning test cycle..."
+	test.hw_test()
 	test.self_test()
 	print "Done!"
