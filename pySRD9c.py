@@ -17,6 +17,7 @@ gear display: 1 byte, each bit is a single segment of the display in the standar
 padding/unknown: 29 bytes, all 0 during normal operation, setting all bytes to 0xff resets the device
 
 Release History:
+2016-05-07: Added wait time on hardware reset
 2016-05-05: Added raw hardware tests
 2016-05-04: Added sanity checks, helper functions, friendlier LED handling
 2016-05-02: Initial release
@@ -147,11 +148,12 @@ class srd9c:
 
 	def hw_reset(self):
 		self.output_report.send([0] + [0xff]*40)
+		sleep(5)
 		self.__init__()
 		return
 
 	def hw_test(self):
-		for c in xrange(10):
+		for c in xrange(11):
 			for i in xrange(8):
 				self.output_report.send([0] + [0]*c + [(1 << i)] + [0]*(39 - c))
 				sleep(0.01)
