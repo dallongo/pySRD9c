@@ -6,7 +6,7 @@ by Dan Allongo (daniel.s.allongo@gmail.com)
 Release History:
 2016-05-06: Split off into separate file
 2016-05-04: Updated per https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs
-2016-05-04: Inital release
+2016-05-04: Initial release
 """
 
 from ctypes import *
