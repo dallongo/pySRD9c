@@ -11,6 +11,7 @@ It uses mmap to read from a shared memory handle.
 Release History:
 2016-05-06: Added settings.json (re-reads file on change while running)
 	Split off shared memory structure definitions to separate file
+	Fixed sector split calculations
 2016-05-05: Added sector split times
 	All split times now compared to previous lap, properly handle invalid laps
 	Fixed race session time/laps remaining
@@ -80,7 +81,7 @@ if __name__ == '__main__':
 						'sector_split':{
 							'_comment':"options are 'self_previous', 'self_best', 'session_best'",
 							'enabled':True,
-							'compare_lap':'self_previous'
+							'compare_lap':'session_best'
 						},
 						'lap_split':{
 							'_comment':"options are 'self_previous', 'self_best', 'session_best'",
@@ -200,11 +201,6 @@ if __name__ == '__main__':
 					dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
 				elif(settings['speed']['units'] == 'km/h'):
 					dash.right = '{0}'.format(int(mps_to_kph(smm.car_speed)))
-				# no running clock on invalid/out laps
-				if(smm.lap_time_current_self > 0):
-					dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
-				else:
-					dash.left = '-.--.-'
 				# get driver data
 				dd = None
 				if(smm.num_cars > 0):
@@ -213,6 +209,11 @@ if __name__ == '__main__':
 							dd = d
 							break
 				if(dd):
+					# no running clock on invalid/out laps
+					if(smm.lap_time_current_self > 0):
+						dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
+					else:
+						dash.left = '-.--.-'
 					# info text timer starts upon entering each sector
 					if(current_sector != dd.track_sector):
 						info_text_time = time()
@@ -222,7 +223,7 @@ if __name__ == '__main__':
 						et = time() - info_text_time
 						et_min = 0
 						et_max = int(settings['info_text']['lap_split']['enabled'])*settings['info_text']['duration']
-						if(et > et_min and et <= et_max and settings['info_text']['lap_split']['enabled']):
+						if(et >= et_min and et < et_max and settings['info_text']['lap_split']['enabled']):
 							if(smm.lap_time_previous_self > 0):
 								dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_previous_self, 60))
 							else:
@@ -244,13 +245,13 @@ if __name__ == '__main__':
 						# show position and number of cars in field
 						et_min += int(settings['info_text']['lap_split']['enabled'])*settings['info_text']['duration']
 						et_max += int(settings['info_text']['position']['enabled'])*settings['info_text']['duration']
-						if(et > et_min and et <= et_max and settings['info_text']['position']['enabled']):
+						if(et >= et_min and et < et_max and settings['info_text']['position']['enabled']):
 							dash.left = 'P{0}'.format(str(smm.position).rjust(3))
 							dash.right = ' {0}'.format(str(smm.num_cars).ljust(3))
 						# show completed laps and laps/time remaining
 						et_min += int(settings['info_text']['position']['enabled'])*settings['info_text']['duration']
 						et_max += int(settings['info_text']['remaining']['enabled'])*settings['info_text']['duration']
-						if(et > et_min and et <= et_max and settings['info_text']['remaining']['enabled']):
+						if(et >= et_min and et < et_max and settings['info_text']['remaining']['enabled']):
 							dash.left = 'L{0}'.format(str(smm.completed_laps).rjust(3))
 							if(smm.number_of_laps > 0):
 								dash.right = ' {0}'.format(str(smm.number_of_laps).ljust(3))
@@ -260,16 +261,25 @@ if __name__ == '__main__':
 								dash.right = ' '*4
 					elif(current_sector in [2, 3] and settings['info_text']['sector_split']['enabled'] and time() - info_text_time <= settings['info_text']['duration']):
 						# show sectors 1 and 2 splits
-						if(dd.sector_time_previous_self[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_previous'):
+						if(smm.lap_time_previous_self > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_previous'):
 							compare_sector = dd.sector_time_previous_self[current_sector - 2]
+							if(current_sector == 3):
+								compare_sector -= dd.sector_time_previous_self[0]
 						if(dd.sector_time_best_self[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_best'):
 							compare_sector = dd.sector_time_best_self[current_sector - 2]
+							if(current_sector == 3):
+								compare_sector -= dd.sector_time_best_self[0]
 						if(smm.session_best_lap_sector_times[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'session_best'):
 							compare_sector = smm.session_best_lap_sector_times[current_sector - 2]
+							if(current_sector == 3):
+								compare_sector -= smm.session_best_lap_sector_times[0]
 						else:
 							compare_sector = 0
-						if(compare_sector > 0 and dd.sector_time_current_self[current_sector - 2] > 0):
-							dash.right = '{0:04.2f}'.format(dd.sector_time_current_self[current_sector - 2] - compare_sector)
+						if(compare_sector > 0 and smm.lap_time_current_self > 0):
+							sector_delta = dd.sector_time_current_self[current_sector - 2] - compare_sector
+							if(current_sector == 3):
+								sector_delta -= dd.sector_time_current_self[0]
+							dash.right = '{0:04.2f}'.format(sector_delta)
 						else:
 							dash.right = '--.--'
 				# blink red status LED at critical fuel level
