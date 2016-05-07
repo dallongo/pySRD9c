@@ -245,14 +245,6 @@ if __name__ == '__main__':
 						et_min += int(settings['info_text']['lap_split']['enabled'])*settings['info_text']['duration']
 						et_max += int(settings['info_text']['position']['enabled'])*settings['info_text']['duration']
 						if(et > et_min and et <= et_max and settings['info_text']['position']['enabled']):
-							if(smm.lap_time_previous_self > 0 and settings['info_text']['lap_split']['compare_lap'] == 'self_previous'):
-								compare_lap = smm.lap_time_previous_self
-							elif(smm.lap_time_best_self > 0 and settings['info_text']['lap_split']['compare_lap'] == 'self_best'):
-								compare_lap = smm.lap_time_best_self
-							elif(smm.lap_time_best_leader > 0 and settings['info_text']['lap_split']['compare_lap'] == 'session_best'):
-								compare_lap = smm.lap_time_best_leader
-							else:
-								compare_lap = 0
 							dash.left = 'P{0}'.format(str(smm.position).rjust(3))
 							dash.right = ' {0}'.format(str(smm.num_cars).ljust(3))
 						# show completed laps and laps/time remaining
