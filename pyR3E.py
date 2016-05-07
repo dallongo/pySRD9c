@@ -1,30 +1,15 @@
 """
-r3e.py - Reads the shared memory map for RaceRoom Racing Experience 
+pyR3E.py - Defines the shared memory map structures for RaceRoom Racing Experience 
 	as outlined by Sector3 Studios (https://github.com/sector3studios/r3e-api)
 by Dan Allongo (daniel.s.allongo@gmail.com)
 
-This is a small application that makes use of the pySRD9c interface 
-to display basic telemetry and status data on the dashboard.
-
-It uses mmap to read from a shared memory handle.
-
 Release History:
-2016-05-05: Added sector split times
-	All split times now compared to previous lap, properly handle invalid laps
-	Fixed race session time/laps remaining
-	Added very basic logging
-	Fixed position and session time/laps remaining not showing when current lap invalidated within first few seconds
-	Consolidated sector split time and lap time information display
-	Basic code clean-up and comments added
-	Removed psutil dependency
+2016-05-06: Split off into separate file
 2016-05-04: Updated per https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs
-	Added blinking effect for critical warnings and DRS/PTP/pit events
-	Added lap/split display
 2016-05-04: Inital release
 """
 
 from ctypes import *
-from mmap import mmap
 
 class r3e_struct(Structure):
 	_pack_ = 1
@@ -292,6 +277,9 @@ def rps_to_rpm(r):
 def mps_to_mph(m):
 	return (m * 2.23694)
 
+def mps_to_kph(m):
+	return (m * 3.6)
+
 def kpa_to_psi(k):
 	return (k * 0.145038)
 
@@ -303,195 +291,3 @@ def l_to_g(l):
 
 r3e_smm_tag = '$Race$'
 r3e_smm_handle = None
-
-if __name__ == '__main__':
-	from traceback import format_exc
-	from time import sleep, time
-	from sys import exit
-	from pySRD9c import srd9c
-
-	# super basic logging func, echos to console
-	def log_print(fh, s):
-		print s
-		if(s[-1] != '\n'):
-			s += '\n'
-		fh.write(s)
-	# variables
-	blink_duration = 0.5
-	blink_last = 0
-	previous_lap = None
-	sector_split_duration = 3
-	sector_split_last = 0
-	sector_split_sector = 0
-	log_filename = 'log.txt'
-	with open(log_filename, 'w') as lfh:
-		try:
-			log_print(lfh, "Waiting for SRD-9c...")
-			dash = srd9c()
-			log_print(lfh, "Connected!")
-			log_print(lfh, "Waiting for shared memory map...")
-			try:
-				r3e_smm_handle = mmap(fileno=0, length=sizeof(r3e_shared), tagname=r3e_smm_tag)
-			except:
-				log_print(lfh, "Unable to open shared memory map")
-				log_print(lfh, format_exc())
-			if(r3e_smm_handle):
-				log_print(lfh, "Shared memory mapped!")
-			else:
-				log_print(lfh, "Shared memory not available, exiting!")
-				exit(1)
-			while(True):
-				sleep(0.01)
-				# read shared memory block
-				r3e_smm_handle.seek(0)
-				smm = r3e_shared.from_buffer_copy(r3e_smm_handle)
-				# use green RPM LEDs for PTP when available
-				if(smm.push_to_pass.amount_left > 0 or smm.push_to_pass.engaged > 0 or smm.drs_engaged > 0):
-					dash.rpm['use_green'] = False
-				elif(smm.push_to_pass.available < 1 and smm.push_to_pass.engaged < 1 and smm.drs_engaged < 1):
-					dash.rpm['use_green'] = True
-				rpm = 0
-				status = ['0']*4
-				if(smm.max_engine_rps > 0):
-					rpm = smm.engine_rps/smm.max_engine_rps
-					rpm -= (1 - (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13)
-					rpm /= (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13
-					if(rpm < 0):
-						rpm = 0
-					# blue status LED shift light at 95% of full RPM range
-					if(smm.engine_rps/smm.max_engine_rps >= 0.95):
-						status[2] = '1'
-				dash.rpm['value'] = rpm
-				dash.gear = dict({'-2':'-', '-1':'r', '0':'n'}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
-				dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
-				# no running clock on invalid/out laps
-				if(smm.lap_time_current_self > 0):
-					dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
-				else:
-					dash.left = '-.--.-'
-				# get driver data
-				dd = None
-				if(smm.num_cars > 0):
-					for d in smm.all_drivers_data_1:
-						if(d.driver_info.slot_id == smm.slot_id):
-							dd = d
-							break
-				if(dd):
-					if(sector_split_sector != dd.track_sector):
-						sector_split_last = time()
-						sector_split_sector = dd.track_sector
-					if(dd.track_sector == 1):
-						# show lap/split times compared to last lap
-						if(time() - sector_split_last <= sector_split_duration):
-							if(smm.lap_time_previous_self > 0):
-								dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_previous_self, 60))
-							else:
-								dash.left = '-.--.-'
-							if(previous_lap and smm.lap_time_previous_self > 0):
-								dash.right = '{0:04.2f}'.format(smm.lap_time_previous_self - previous_lap)
-							else:
-								dash.right = '--.--'
-						# show position and number of cars in field
-						elif(time() - sector_split_last <= sector_split_duration*2):
-							if(smm.lap_time_previous_self > 0):
-								previous_lap = smm.lap_time_previous_self
-							else:
-								previous_lap = None
-							dash.left = 'P{0}'.format(str(smm.position).rjust(3))
-							dash.right = ' {0}'.format(str(smm.num_cars).ljust(3))
-						# show completed laps and laps/time remaining
-						elif(time() - sector_split_last <= sector_split_duration*3):
-							dash.left = 'L{0}'.format(str(smm.completed_laps).rjust(3))
-							if(smm.number_of_laps > 0):
-								dash.right = ' {0}'.format(str(smm.number_of_laps).ljust(3))
-							elif(smm.session_time_remaining > 0):
-								dash.right = '{0:02.0f}.{1:04.1f}'.format(*divmod(smm.session_time_remaining, 60))
-							else:
-								dash.right = ' '*4
-					elif(dd.track_sector in [2, 3]):
-						# show sectors 1 and 2 splits
-						if(time() - sector_split_last <= sector_split_duration):
-							if(dd.sector_time_previous_self[dd.track_sector - 2] > 0 and dd.sector_time_current_self[dd.track_sector - 2] > 0):
-								dash.right = '{0:04.2f}'.format(dd.sector_time_current_self[dd.track_sector - 2] - dd.sector_time_previous_self[dd.track_sector - 2])
-							else:
-								dash.right = '--.--'
-				# blink red status LED at critical fuel level
-				if(smm.fuel_use_active == 1 and smm.fuel_capacity > 0 and smm.fuel_left/smm.fuel_capacity <= 0.1):
-					status[0] = '1'
-					if(smm.fuel_left/smm.fuel_capacity < 0.05):
-						if(time() - blink_last >= blink_duration*2):
-							blink_last = time()
-						if(time() - blink_last <= blink_duration):
-							status[0] = '1'
-							dash.left = 'fuel'
-						if(time() - blink_last > blink_duration):
-							status[0] = '0'
-				# blink yellow status LED at critical coolant temp
-				if(smm.engine_water_temp >= 91):
-					status[1] = '1'
-					if(smm.engine_water_temp > 93):
-						if(time() - blink_last >= blink_duration*2):
-							blink_last = time()
-						if(time() - blink_last <= blink_duration):
-							status[1] = '1'
-						if(time() - blink_last > blink_duration):
-							status[1] = '0'
-							dash.left = 'heat'
-				# blink green status LED while in pit/limiter active
-				if(smm.pit_window_status == r3e_pit_window.R3E_PIT_WINDOW_OPEN):
-					status[3] = '1'
-				if(smm.pit_window_status == r3e_pit_window.R3E_PIT_WINDOW_STOPPED or smm.pit_limiter == 1):
-					if(time() - blink_last >= blink_duration*2):
-						blink_last = time()
-					if(time() - blink_last <= blink_duration):
-						status[3] = '1'
-					if(time() - blink_last > blink_duration):
-						status[3] = '0'
-						dash.right = 'pit '
-				# blink green RPM LED and DRS on display while DRS engaged (untested)
-				if(smm.drs_engaged == 1):
-					if(time() - blink_last >= blink_duration*2):
-						blink_last = time()
-					if(time() - blink_last <= blink_duration):
-						dash.rpm['green'] = '0110'
-						dash.left = 'drs '
-						dash.right = ' on '
-					if(time() - blink_last > blink_duration):
-						dash.rpm['green'] = '1001'
-				# blink green RPM LED during PTP cool-down, charging effect on last 4 seconds
-				if(smm.push_to_pass.amount_left > 0):
-					if(smm.push_to_pass.wait_time_left <= 4):
-						dash.rpm['green'] = ('0'*(int(smm.push_to_pass.wait_time_left))).rjust(4, '1')
-					else:
-						if(time() - blink_last >= blink_duration*2):
-							blink_last = time()
-						if(time() - blink_last <= blink_duration):
-							dash.rpm['green'] = '1000'
-						if(time() - blink_last > blink_duration):
-							dash.rpm['green'] = '0001'
-				# blink green RPM LED during PTP engaged, depleting effect on last 4 seconds
-				# blink PTP activations remaining on display while PTP engaged
-				if(smm.push_to_pass.engaged == 1):
-					if(smm.push_to_pass.engaged_time_left <= 4):
-						dash.rpm['green'] = ('1'*(int(smm.push_to_pass.engaged_time_left))).rjust(4, '0')
-					else:
-						if(time() - blink_last >= blink_duration*2):
-							blink_last = time()
-						if(time() - blink_last <= blink_duration):
-							dash.rpm['green'] = '0110'
-							dash.left = ' ptp'
-							dash.right = str(smm.push_to_pass.amount_left).ljust(4)
-						if(time() - blink_last > blink_duration):
-							dash.rpm['green'] = '1001'
-				dash.status = ''.join(status)
-				# make sure engine is running
-				if(smm.engine_rps > 0):
-					dash.update()
-				else:
-					dash.reset()
-				
-			log_print(lfh, "Closing shared memory map...")
-			r3e_smm_handle.close()
-		except:
-			log_print(lfh, "Unhandled exception!")
-			log_print(lfh, format_exc())

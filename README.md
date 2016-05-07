@@ -1,8 +1,8 @@
 # pySRD9c
 
-A Python test application for the Renovatio SRD-9c display (http://www.renovatio-dev.com/).
+A Python library application for the Renovatio SRD-9c display (http://www.renovatio-dev.com/).
 
-This small application makes use of the pywinusb module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses the HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
+This makes use of the pywinusb module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses the HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
 
 The output report is structured as follows (41 bytes total):
 
@@ -14,11 +14,19 @@ The output report is structured as follows (41 bytes total):
 * gear display: 1 byte, each bit is a single segment of the display in the standard order (1 digit)
 * padding/unknown: 29 bytes, all 0 during normal operation, setting all bytes to 0xff resets the device
 
-A sample application providing real-time telemetry data for RaceRoom Racing Experience is available in `r3e.py`.
+Run by itself, `pySRD9c.py` will conduct a self-test on the display.
+
+A sample application providing real-time telemetry data for RaceRoom Racing Experience is available in `pyDashR3E.py`.
 It demonstrates custom mapping of RPM LEDs for use as push-to-pass/drs indicators as well as warnings that blink the status LEDs during a critical state.
 It also features live lap timing, lap split time, field position, and lap progession during a race.
+The dash configuration is controlled via the `pyDashR3E.settings.json` file (created on start-up if not found, re-read if modified while running).
 
 ### Releases
+#### 2016-05-06
+
+* Split `r3e.py` into `pyDashR3E.py` and `pyR3E.py` for the memory API structure
+* Added configuration control via `pyDashR3E.settings.json`
+
 #### 2016-05-05
 
 * Added sector split times
