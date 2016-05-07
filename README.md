@@ -22,6 +22,12 @@ It also features live lap timing, lap split time, field position, and lap proges
 The dash configuration is controlled via the `pyDashR3E.settings.json` file (created on start-up if not found, re-read if modified while running).
 
 ### Releases
+#### 2016-05-07
+
+* Consolidate DRS and PTP light code
+* Add spec, version, and icon file (from https://smarticons.co/set/glyph) for building with `pyinstaller`
+* Add wait time to `srd9c.hw_reset()`
+
 #### 2016-05-06
 
 * Split `r3e.py` into `pyDashR3E.py` and `pyR3E.py` for the memory API structure
