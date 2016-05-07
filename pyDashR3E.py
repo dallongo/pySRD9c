@@ -9,6 +9,8 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-05-07: Merge DRS with PTP LED routine
+	Added version number to start up console output
 2016-05-06: Added settings.json (re-reads file on change while running)
 	Split off shared memory structure definitions to separate file
 	Fixed sector split calculations
@@ -23,8 +25,14 @@ Release History:
 2016-05-04: Updated per https://github.com/mrbelowski/CrewChiefV4/blob/master/CrewChiefV4/R3E/RaceRoomData.cs
 	Added blinking effect for critical warnings and DRS/PTP/pit events
 	Added lap/split display
-2016-05-04: Inital release
+2016-05-04: Initial release
 """
+
+APP_NAME = 'pyDashR3E'
+APP_VER = '1.0.0.0'
+APP_DESC = 'Python sim racing dashboard control'
+APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
+APP_URL = 'https://github.com/dallongo/pySRD9c'
 
 if __name__ == '__main__':
 	from traceback import format_exc
@@ -37,7 +45,12 @@ if __name__ == '__main__':
 	from pyR3E import *
 	from pySRD9c import srd9c
 
-	with open('pyDashR3E.log', 'a+') as lfh:
+	print "{0} v.{1}".format(APP_NAME, APP_VER)
+	print APP_DESC
+	print APP_AUTHOR
+	print APP_URL
+
+	with open(APP_NAME + '.log', 'a+') as lfh:
 		try:
 			# super basic logging func, echos to console
 			def log_print(s):
@@ -119,7 +132,7 @@ if __name__ == '__main__':
 						# merge with defaults to catch missing keys
 						settings = dict(defaults, **json.load(f))
 					except ValueError:
-						log_print("Invalid settings JSON, using defaults")
+						log_print("Invalid or missing settings file, creating using defaults")
 						settings = defaults
 					if(settings != defaults):
 						# validate setting values
@@ -141,7 +154,7 @@ if __name__ == '__main__':
 					json.dump(settings, f, indent=4, separators=(',',': '), sort_keys=True)
 				return settings
 			log_print("-"*16 + " INIT " + "-"*16)
-			settings_fn = 'pyDashR3E.settings.json'
+			settings_fn = APP_NAME + '.settings.json'
 			settings_mtime = 0
 			settings = None
 			# variables
@@ -153,7 +166,6 @@ if __name__ == '__main__':
 			log_print("Waiting for SRD-9c...")
 			dash = srd9c()
 			log_print("Connected!")
-			log_print("Waiting for shared memory map...")
 			try:
 				r3e_smm_handle = mmap(fileno=0, length=sizeof(r3e_shared), tagname=r3e_smm_tag)
 			except:
@@ -312,15 +324,6 @@ if __name__ == '__main__':
 						status[3] = '1'
 					if(settings['text_blink']['enabled'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
 						dash.right = 'pit '
-				# blink green RPM LED and DRS on display while DRS engaged (untested)
-				if(smm.drs_engaged == 1):
-					if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
-						dash.rpm['green'] = '0110'
-					else:
-						dash.rpm['green'] = '1001'
-					if(settings['drs_ptp']['text'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
-						dash.left = 'drs '
-						dash.right = ' on '
 				# blink green RPM LED during PTP cool-down, charging effect on last 4 seconds
 				if(smm.push_to_pass.amount_left > 0):
 					if(smm.push_to_pass.wait_time_left <= 4):
@@ -330,9 +333,9 @@ if __name__ == '__main__':
 							dash.rpm['green'] = '0000'
 						else:
 							dash.rpm['green'] = '1000'
-				# blink green RPM LED during PTP engaged, depleting effect on last 4 seconds
+				# blink green RPM LED during DRS/PTP engaged, depleting effect on last 4 seconds
 				# blink PTP activations remaining on display while PTP engaged
-				if(smm.push_to_pass.engaged == 1):
+				if(smm.push_to_pass.engaged == 1 or smm.drs_engaged == 1):
 					if(smm.push_to_pass.engaged_time_left <= 4):
 						dash.rpm['green'] = ('1'*(int(smm.push_to_pass.engaged_time_left))).rjust(4, '0')
 					else:
@@ -343,13 +346,16 @@ if __name__ == '__main__':
 						if(settings['drs_ptp']['text'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
 							dash.left = ' ptp'
 							dash.right = str(smm.push_to_pass.amount_left).ljust(4)
-				dash.status = ''.join(status)
+							if(smm.drs_engaged == 1):
+								dash.left = 'drs '
+								dash.right = ' on '
 				# make sure engine is running
 				if(smm.engine_rps > 0):
+					dash.status = ''.join(status)
 					dash.update()
 				else:
 					dash.reset()
-				
+			# never gets here				
 			log_print("Closing shared memory map...")
 			r3e_smm_handle.close()
 		except:
