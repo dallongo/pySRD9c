@@ -11,6 +11,7 @@ It uses mmap to read from a shared memory handle.
 Release History:
 2016-05-07: Merge DRS with PTP LED routine
 	Added version number to start up console output
+	Updated temp/fuel logic (average first 2 laps as baseline)
 2016-05-06: Added settings.json (re-reads file on change while running)
 	Split off shared memory structure definitions to separate file
 	Fixed sector split calculations
@@ -163,6 +164,11 @@ if __name__ == '__main__':
 			compare_sector = 0
 			info_text_time = 0
 			current_sector = 0
+			samples = {'water':[], 'oil':[], 'fuel':[], 
+				'avg_water':None, 'avg_oil':None, 'avg_fuel':None,
+				'warn_temp':None, 'warn_fuel':3,
+				'critical_temp':None, 'critical_fuel':1, 'size':7}
+			compare_fuel = 0
 			log_print("Waiting for SRD-9c...")
 			dash = srd9c()
 			log_print("Connected!")
@@ -230,6 +236,25 @@ if __name__ == '__main__':
 					if(current_sector != dd.track_sector):
 						info_text_time = time()
 						current_sector = dd.track_sector
+						# calculate temps and fuel use for first few laps as baseline
+						if(smm.fuel_use_active == 1):
+							if(compare_fuel > 0 and not samples['avg_fuel']):
+								if(len(samples['fuel']) < samples['size']):
+									samples['fuel'].append(compare_fuel - smm.fuel_left)
+								else:
+									samples['avg_fuel'] = sum(samples['fuel'][1:])*3/len(samples['fuel'][1:])
+							elif(compare_fuel == 0):
+								compare_fuel = smm.fuel_left
+						if(len(samples['water']) < samples['size']):
+							samples['water'].append(smm.engine_water_temp)
+						elif(not samples['avg_water']):
+							samples['avg_water'] = sum(samples['water'][1:])/len(samples['water'][1:])
+							samples['warn_temp'] = max(samples['water']) - min(samples['water'])
+							samples['critical_temp'] = samples['warn_temp']*1.5
+						if(len(samples['oil']) < samples['size']):
+							samples['oil'].append(smm.engine_oil_temp)
+						elif(not samples['avg_oil']):
+							samples['avg_oil'] = sum(samples['oil'][1:])/len(samples['oil'][1:])
 					if(current_sector == 1):
 						# show lap time compared to last/best/session best lap
 						et = time() - info_text_time
@@ -295,19 +320,21 @@ if __name__ == '__main__':
 						else:
 							dash.right = '--.--'
 				# blink red status LED at critical fuel level
-				if(smm.fuel_use_active == 1 and smm.fuel_capacity > 0 and smm.fuel_left/smm.fuel_capacity <= 0.1):
+				if(samples['avg_fuel'] and smm.fuel_left/samples['avg_fuel'] <= samples['warn_fuel']):
 					status[0] = '1'
-					if(smm.fuel_left/smm.fuel_capacity < 0.05):
+					if(smm.fuel_left/samples['avg_fuel'] < samples['critical_fuel']):
 						if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
 							status[0] = '0'
 						else:
 							status[0] = '1'
 						if(settings['text_blink']['enabled'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
 							dash.left = 'fuel'
-				# blink yellow status LED at critical coolant temp
-				if(smm.engine_water_temp >= 91):
+				# blink yellow status LED at critical oil/coolant temp
+				if((samples['avg_water'] and smm.engine_water_temp - samples['avg_water'] >= samples['warn_temp']) or
+					(samples['avg_oil'] and smm.engine_oil_temp - samples['avg_oil'] >= samples['warn_temp'])):
 					status[1] = '1'
-					if(smm.engine_water_temp > 93):
+					if((smm.engine_water_temp - samples['avg_water'] > samples['critical_temp']) or
+						(smm.engine_oil_temp - samples['avg_oil'] > samples['critical_temp'])):
 						if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
 							status[1] = '0'
 						else:
