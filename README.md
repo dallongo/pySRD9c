@@ -24,6 +24,7 @@ The dash configuration is controlled via the `pyDashR3E.settings.json` file (cre
 ### Releases
 #### 2016-05-07
 
+* Update fuel/temp logic (average over first two laps as baseline)
 * Consolidate DRS and PTP light code
 * Add spec, version, and icon file (from https://smarticons.co/set/glyph) for building with `pyinstaller`
 * Add wait time to `srd9c.hw_reset()`
