@@ -22,8 +22,9 @@ It also features live lap timing, lap split time, field position, and lap proges
 The dash configuration is controlled via the `pyDashR3E.settings.json` file (created on start-up if not found, re-read if modified while running).
 
 ### Releases
-#### 2016-05-07
+#### 2016-05-07 (v1.0.0.0)
 
+* First compiled/binary release!
 * Update fuel/temp logic (average over first two laps as baseline)
 * Consolidate DRS and PTP light code
 * Add spec, version, and icon file (from https://smarticons.co/set/glyph) for building with `pyinstaller`
