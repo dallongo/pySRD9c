@@ -21,7 +21,15 @@ It demonstrates custom mapping of RPM LEDs for use as push-to-pass/drs indicator
 It also features live lap timing, lap split time, field position, and lap progession during a race.
 The dash configuration is controlled via the `pyDashR3E.settings.json` file (created on start-up if not found, re-read if modified while running).
 
+Also included is a sample application using telemetry data from rFactor 1 via the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
+
 ### Releases
+#### 2016-05-09 (v1.0.1.0)
+
+* Added `pyRF1.py` and `pyDashRF1.py` to support rFactor 1-based sims
+* Fixed errors in fuel and sector split time calculations
+* Added missing checks on 'drs_ptp' settings
+
 #### 2016-05-07 (v1.0.0.0)
 
 * First compiled/binary release!
