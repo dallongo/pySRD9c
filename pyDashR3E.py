@@ -9,6 +9,8 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-05-09: Add missing sanity check for 'drs_ptp' settings
+	Fix errors in fuel and sector split calculations (again)
 2016-05-07: Merge DRS with PTP LED routine
 	Added version number to start up console output
 	Updated temp/fuel logic (average first 2 laps as baseline)
@@ -30,7 +32,7 @@ Release History:
 """
 
 APP_NAME = 'pyDashR3E'
-APP_VER = '1.0.0.0'
+APP_VER = '1.0.1.0'
 APP_DESC = 'Python sim racing dashboard control'
 APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c'
@@ -150,6 +152,8 @@ if __name__ == '__main__':
 						settings['info_text']['lap_split']['compare_lap'] = check_option(settings['info_text']['lap_split']['compare_lap'], 'str', defaults['info_text']['lap_split']['compare_lap'], ['self_previous', 'self_best', 'session_best'])
 						settings['neutral']['symbol'] = check_option(settings['neutral']['symbol'], 'str', defaults['neutral']['symbol'], ['0', 'n', '-', '_', ' '])
 						settings['speed']['units'] = check_option(settings['speed']['units'], 'str', defaults['speed']['units'], ['mph', 'km/h'])
+						settings['drs_ptp']['text'] = check_option(settings['drs_ptp']['text'], 'bool', defaults['drs_ptp']['text'])
+						settings['drs_ptp']['led'] = check_option(settings['drs_ptp']['led'], 'bool', defaults['drs_ptp']['led'])
 				# write out validated settings
 				with open(sfn, 'w') as f:
 					json.dump(settings, f, indent=4, separators=(',',': '), sort_keys=True)
@@ -236,15 +240,15 @@ if __name__ == '__main__':
 					if(current_sector != dd.track_sector):
 						info_text_time = time()
 						current_sector = dd.track_sector
-						# calculate temps and fuel use for first few laps as baseline
+						# calculate fuel use average continuously (dimishes over time) and ignore first sector after refuel
 						if(smm.fuel_use_active == 1):
-							if(compare_fuel > 0 and not samples['avg_fuel']):
-								if(len(samples['fuel']) < samples['size']):
-									samples['fuel'].append(compare_fuel - smm.fuel_left)
-								else:
-									samples['avg_fuel'] = sum(samples['fuel'][1:])*3/len(samples['fuel'][1:])
-							elif(compare_fuel == 0):
-								compare_fuel = smm.fuel_left
+							if(compare_fuel > 0 and compare_fuel > smm.fuel_left):
+								samples['fuel'].append(compare_fuel - smm.fuel_left)
+								if(len(samples['fuel']) > samples['size']):
+									samples['fuel'] = samples['fuel'][-samples['size']:]
+									samples['avg_fuel'] = sum(samples['fuel'])*3/len(samples['fuel'])
+							compare_fuel = smm.fuel_left
+						# calculate temps for first few laps as baseline
 						if(len(samples['water']) < samples['size']):
 							samples['water'].append(smm.engine_water_temp)
 						elif(not samples['avg_water']):
@@ -302,11 +306,11 @@ if __name__ == '__main__':
 							compare_sector = dd.sector_time_previous_self[current_sector - 2]
 							if(current_sector == 3):
 								compare_sector -= dd.sector_time_previous_self[0]
-						if(dd.sector_time_best_self[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_best'):
+						elif(dd.sector_time_best_self[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_best'):
 							compare_sector = dd.sector_time_best_self[current_sector - 2]
 							if(current_sector == 3):
 								compare_sector -= dd.sector_time_best_self[0]
-						if(smm.session_best_lap_sector_times[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'session_best'):
+						elif(smm.session_best_lap_sector_times[current_sector - 2] > 0 and settings['info_text']['sector_split']['compare_lap'] == 'session_best'):
 							compare_sector = smm.session_best_lap_sector_times[current_sector - 2]
 							if(current_sector == 3):
 								compare_sector -= smm.session_best_lap_sector_times[0]
