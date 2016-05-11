@@ -230,6 +230,17 @@ if __name__ == '__main__':
 						if(d.driver_info.slot_id == smm.slot_id):
 							dd = d
 							break
+				else:
+					# clear session variables on exiting session
+					compare_lap = 0
+					compare_sector = 0
+					info_text_time = 0
+					current_sector = 0
+					samples = {'water':[], 'oil':[], 'fuel':[], 
+						'avg_water':None, 'avg_oil':None, 'avg_fuel':None,
+						'warn_temp':None, 'warn_fuel':3,
+						'critical_temp':None, 'critical_fuel':1, 'size':7}
+					compare_fuel = 0
 				if(dd):
 					# no running clock on invalid/out laps
 					if(smm.lap_time_current_self > 0):
