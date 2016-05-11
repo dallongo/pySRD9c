@@ -147,7 +147,6 @@ if __name__ == '__main__':
 				'warn_temp':None, 'warn_fuel':3,
 				'critical_temp':None, 'critical_fuel':1, 'size':7}
 			compare_fuel = 0
-			lastET = {'value':0, 'update':0, 'delta':0}
 			log_print("Waiting for SRD-9c...")
 			dash = srd9c()
 			log_print("Connected!")
@@ -193,24 +192,6 @@ if __name__ == '__main__':
 					dash.right = '{0}'.format(int(mps_to_mph(smm.speed)))
 				elif(settings['speed']['units'] == 'km/h'):
 					dash.right = '{0}'.format(int(mps_to_kph(smm.speed)))
-				# session time
-				if(smm.currentET != lastET['value']):
-					# new session, reset tracking variables
-					if(smm.currentET < lastET['value']):
-						compare_lap = 0
-						compare_sector = 0
-						current_sector = 1
-						samples = {'water':[], 'oil':[], 'fuel':[], 
-							'avg_water':None, 'avg_oil':None, 'avg_fuel':None,
-							'warn_temp':None, 'warn_fuel':3,
-							'critical_temp':None, 'critical_fuel':1, 'size':7}
-						compare_fuel = 0
-					lastET['value'] = smm.currentET
-					lastET['update'] = time()
-				lastET['delta'] = time() - lastET['update']
-				# stall timer delta while not in real time
-				if(lastET['delta'] > 0.5 and lastET['value'] > 0):
-					lastET['delta'] = 0.5
 				# get driver data
 				dd = None
 				bestLapTimeSession = 0
@@ -226,9 +207,20 @@ if __name__ == '__main__':
 							bestSector1Session = d.bestSector1
 						if(d.bestSector2 > 0 and (bestSector2Session == 0 or d.bestSector2 < bestSector2Session)):
 							bestSector2Session = d.bestSector2
+				else:
+					# clear session variables on exiting session
+					compare_lap = 0
+					compare_sector = 0
+					info_text_time = 0
+					current_sector = 1
+					samples = {'water':[], 'oil':[], 'fuel':[], 
+						'avg_water':None, 'avg_oil':None, 'avg_fuel':None,
+						'warn_temp':None, 'warn_fuel':3,
+						'critical_temp':None, 'critical_fuel':1, 'size':7}
+					compare_fuel = 0
 				if(dd):
 					if(smm.currentET > 0 and smm.lapStartET > 0 and smm.lapNumber > 0):
-						currentLapTime = (smm.currentET + lastET['delta']) - smm.lapStartET
+						currentLapTime = smm.currentET - smm.lapStartET
 					else:
 						currentLapTime = 0
 					# no running clock on invalid/out laps
@@ -296,7 +288,7 @@ if __name__ == '__main__':
 							if(smm.maxLaps > 0 and smm.maxLaps < 200):
 								dash.right = ' {0}'.format(str(smm.maxLaps).ljust(3))
 							elif(smm.endET > 0):
-								dash.right = '{0:02.0f}.{1:04.1f}'.format(*divmod(smm.endET - (smm.currentET + lastET['delta']), 60))
+								dash.right = '{0:02.0f}.{1:04.1f}'.format(*divmod(smm.endET - smm.currentET, 60))
 							else:
 								dash.right = ' '*4
 					elif(current_sector in [2, 0] and settings['info_text']['sector_split']['enabled'] and time() - info_text_time <= settings['info_text']['duration']):

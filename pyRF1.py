@@ -94,7 +94,7 @@ class rfWheel(rfStruct):
 				('flat', c_bool),
 				('detached', c_bool)]
 
-# only updated every 0.5 seconds as part of scoring data!
+# only updated every 0.5 seconds (interpolated when deltaTime > 0)
 class rfVehicleInfo(rfStruct):
 	_fields_ = [('driverName', c_char*32),
 				('vehicleName', c_char*64),
@@ -168,7 +168,9 @@ class rfShared(rfStruct):
 				('lastImpactET', c_float),
 				('lastImpactMagnitude', c_float),
 				('lastImpactPos', rfVec3),
-				('wheel', rfWheel*4),			# below this line is only updated every 0.5 seconds!
+				('wheel', rfWheel*4),			
+
+				# below this line is only updated every 0.5 seconds! (interpolated when deltaTime > 0)
 				('session', c_long),
 				('currentET', c_float),
 				('endET', c_float),
