@@ -9,6 +9,7 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-05-12: Fix DRS LEDs for DTM 2013-2016 classes
 2016-05-09: Add missing sanity check for 'drs_ptp' settings
 	Fix errors in fuel and sector split calculations (again)
 2016-05-07: Merge DRS with PTP LED routine
@@ -32,7 +33,7 @@ Release History:
 """
 
 APP_NAME = 'pyDashR3E'
-APP_VER = '1.0.1.0'
+APP_VER = '1.1.0.0'
 APP_DESC = 'Python sim racing dashboard control'
 APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c'
@@ -196,33 +197,6 @@ if __name__ == '__main__':
 				# read shared memory block
 				r3e_smm_handle.seek(0)
 				smm = r3e_shared.from_buffer_copy(r3e_smm_handle)
-				# use green RPM LEDs for PTP when available
-				if((smm.push_to_pass.amount_left > 0 or smm.push_to_pass.engaged > 0 or smm.drs_engaged > 0) and settings['drs_ptp']['led']):
-					dash.rpm['use_green'] = False
-				elif(smm.push_to_pass.available < 1 and smm.push_to_pass.engaged < 1 and smm.drs_engaged < 1):
-					dash.rpm['use_green'] = True
-				# used by the blink timers (all things that blink do so in unison)
-				if(time() - blink_time['led'] >= settings['led_blink']['duration']*2):
-					blink_time['led'] = time()
-				if(time() - blink_time['text'] >= settings['text_blink']['duration']*2):
-					blink_time['text'] = time()
-				rpm = 0
-				status = ['0']*4
-				if(smm.max_engine_rps > 0):
-					rpm = smm.engine_rps/smm.max_engine_rps
-					rpm -= (1 - (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13)
-					rpm /= (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13
-					if(rpm < 0):
-						rpm = 0
-					# blue status LED shift light at 95% of full RPM range
-					if(smm.engine_rps/smm.max_engine_rps >= 0.95):
-						status[2] = '1'
-				dash.rpm['value'] = rpm
-				dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
-				if(settings['speed']['units'] == 'mph'):
-					dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
-				elif(settings['speed']['units'] == 'km/h'):
-					dash.right = '{0}'.format(int(mps_to_kph(smm.car_speed)))
 				# get driver data
 				dd = None
 				if(smm.num_cars > 0):
@@ -242,6 +216,35 @@ if __name__ == '__main__':
 						'critical_temp':None, 'critical_fuel':1, 'size':7}
 					compare_fuel = 0
 				if(dd):
+					# use green RPM LEDs for PTP when available
+					if((smm.push_to_pass.amount_left > 0 or smm.push_to_pass.engaged > -1 or smm.drs_engaged > 0 or 
+						# DTM 2013, 2014, 2015, 2016
+						(smm.drs_available == 1 and dd.driver_info.class_id in [1921, 3086, 4260, 5262])) and settings['drs_ptp']['led']):
+						dash.rpm['use_green'] = False
+					elif((smm.push_to_pass.available < 1 and smm.push_to_pass.engaged < 1) or (smm.drs_engaged == 0 and smm.drs_available == 0)):
+						dash.rpm['use_green'] = True
+					# used by the blink timers (all things that blink do so in unison)
+					if(time() - blink_time['led'] >= settings['led_blink']['duration']*2):
+						blink_time['led'] = time()
+					if(time() - blink_time['text'] >= settings['text_blink']['duration']*2):
+						blink_time['text'] = time()
+					rpm = 0
+					status = ['0']*4
+					if(smm.max_engine_rps > 0):
+						rpm = smm.engine_rps/smm.max_engine_rps
+						rpm -= (1 - (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13)
+						rpm /= (int(dash.rpm['use_green']) + int(dash.rpm['use_red']) + int(dash.rpm['use_blue']))*0.13
+						if(rpm < 0):
+							rpm = 0
+						# blue status LED shift light at 95% of full RPM range
+						if(smm.engine_rps/smm.max_engine_rps >= 0.95):
+							status[2] = '1'
+					dash.rpm['value'] = rpm
+					dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
+					if(settings['speed']['units'] == 'mph'):
+						dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
+					elif(settings['speed']['units'] == 'km/h'):
+						dash.right = '{0}'.format(int(mps_to_kph(smm.car_speed)))
 					# no running clock on invalid/out laps
 					if(smm.lap_time_current_self > 0):
 						dash.left = '{0:01.0f}.{1:04.1f}'.format(*divmod(smm.lap_time_current_self, 60))
@@ -367,18 +370,18 @@ if __name__ == '__main__':
 					if(settings['text_blink']['enabled'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
 						dash.right = 'pit '
 				# blink green RPM LED during PTP cool-down, charging effect on last 4 seconds
-				if(smm.push_to_pass.amount_left > 0):
-					if(smm.push_to_pass.wait_time_left <= 4):
+				if(not dash.rpm['use_green']):
+					if(smm.push_to_pass.wait_time_left >= 0 and smm.push_to_pass.wait_time_left <= 4):
 						dash.rpm['green'] = ('0'*(int(smm.push_to_pass.wait_time_left))).rjust(4, '1')
 					else:
 						if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
-							dash.rpm['green'] = '0000'
+							dash.rpm['green'] = '0100'
 						else:
 							dash.rpm['green'] = '1000'
 				# blink green RPM LED during DRS/PTP engaged, depleting effect on last 4 seconds
 				# blink PTP activations remaining on display while PTP engaged
 				if(smm.push_to_pass.engaged == 1 or smm.drs_engaged == 1):
-					if(smm.push_to_pass.engaged_time_left <= 4):
+					if(smm.push_to_pass.engaged_time_left >= 0 and smm.push_to_pass.engaged_time_left <= 4):
 						dash.rpm['green'] = ('1'*(int(smm.push_to_pass.engaged_time_left))).rjust(4, '0')
 					else:
 						if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
@@ -392,7 +395,7 @@ if __name__ == '__main__':
 								dash.left = 'drs '
 								dash.right = ' on '
 				# make sure engine is running
-				if(smm.engine_rps > 0):
+				if(rps_to_rpm(smm.engine_rps) > 1):
 					dash.status = ''.join(status)
 					dash.update()
 				else:
