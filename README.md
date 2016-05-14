@@ -24,6 +24,12 @@ The dash configuration is controlled via the `pyDashR3E.settings.json` file (cre
 Also included is a sample application using telemetry data from rFactor 1 via the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
 
 ### Releases
+#### 2016-05-14 (v1.1.0.0)
+
+* Fix DRS LEDs for R3E DTM 2013-2016 cars
+* 32-bit builds for `pySRD9c`, `pyDashR3E`, and `pyDashRF1`
+* Live gameplay video with R3E available at https://youtu.be/A4aYvwhkx8I
+
 #### 2016-05-09 (v1.0.1.0)
 
 * Added `pyRF1.py` and `pyDashRF1.py` to support rFactor 1-based sims
