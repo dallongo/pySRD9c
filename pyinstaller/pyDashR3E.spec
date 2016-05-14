@@ -25,4 +25,4 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True , version='pyDashR3E.version.txt', icon='pyDashR3E.ico')
+          console=True , version='pyDashR3E.version.txt', icon='pyDash.ico')
