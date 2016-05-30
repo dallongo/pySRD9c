@@ -2,7 +2,7 @@
 
 A Python library application for the Renovatio SRD-9c display (http://www.renovatio-dev.com/).
 
-This makes use of the pywinusb module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses the HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
+This makes use of the `pywinusb` module (https://github.com/rene-aguirre/pywinusb) to interface with the SRD-9c display. The display uses the HID protocol to provide an input interface as a joystick and an output interface for the nine 7-segment displays and 16 LEDs. 
 
 The output report is structured as follows (41 bytes total):
 
@@ -16,14 +16,26 @@ The output report is structured as follows (41 bytes total):
 
 Run by itself, `pySRD9c.py` will conduct a self-test on the display.
 
-A sample application providing real-time telemetry data for RaceRoom Racing Experience is available in `pyDashR3E.py`.
-It demonstrates custom mapping of RPM LEDs for use as push-to-pass/drs indicators as well as warnings that blink the status LEDs during a critical state.
+A sample application providing real-time telemetry data for RaceRoom Racing Experience and rFactor 1/Stock Car Extreme/Automobilista is available in `pyDash.py`. It makes use of the `psutil` module (https://github.com/giampaolo/psutil) to detect which sim is running. 
+It demonstrates custom mapping of RPM LEDs for use as push-to-pass/DRS indicators as well as warnings that blink the status LEDs during a critical state.
 It also features live lap timing, lap split time, field position, and lap progession during a race.
-The dash configuration is controlled via the `pyDashR3E.settings.json` file (created on start-up if not found, re-read if modified while running).
+The dash configuration is controlled via the `pyDash.settings.json` file (created on start-up if not found, re-read if modified while running).
 
-Also included is a sample application using telemetry data from rFactor 1 via the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
+Support for rFactor 1 is provided by the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
 
 ### Releases
+#### 2016-05-30 (v2.0.0.0)
+
+* Merged `pyDashR3E` and `pyDashRF1` into single application
+* Improved session detection and clearing/resetting of session-specific variables
+* Improved logging prints time stamp and information when new session is detected, average fuel use/temperature ranges and lap times
+* Improved fuel use estimates and overheating detection by using weighted averages
+* Display now cleared upon exiting sim
+* Mulitple instance detection to protect against race condition that causes settings JSON to be infinitely rewritten to disk
+* Automatic sim detection
+* Tachometer range and shift light point can now be configured via settings
+* Fuel and temperature warnings can now be disabled/tuned via settings
+
 #### 2016-05-14 (v1.1.0.0)
 
 * Fix DRS LEDs for R3E DTM 2013-2016 cars

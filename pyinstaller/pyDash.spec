@@ -3,7 +3,7 @@
 block_cipher = None
 
 
-a = Analysis(['pyDashR3E.py'],
+a = Analysis(['pyDash.py'],
              pathex=['C:\\'],
              binaries=None,
              datas=None,
@@ -21,8 +21,8 @@ exe = EXE(pyz,
           a.binaries,
           a.zipfiles,
           a.datas,
-          name='pyDashR3E',
+          name='pyDash',
           debug=False,
           strip=False,
           upx=True,
-          console=True , version='pyDashR3E.version.txt', icon='pyDash.ico')
+          console=True , version='pyDash.version.txt', icon='pyDash.ico')
