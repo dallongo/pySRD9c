@@ -24,6 +24,10 @@ The dash configuration is controlled via the `pyDash.settings.json` file (create
 Support for rFactor 1 is provided by the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
 
 ### Releases
+#### 2016-05-31 (v2.0.0.1)
+
+* Fix array index type error (float instead of int) for fuel array slicing
+
 #### 2016-05-30 (v2.0.0.0)
 
 * Merged `pyDashR3E` and `pyDashRF1` into single application

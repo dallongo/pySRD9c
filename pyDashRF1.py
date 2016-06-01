@@ -9,6 +9,7 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-05-31: Fix array index type error (float instead of int) for fuel array slicing
 2016-05-30: Weighted moving average used for fuel estimates
 2016-05-29: Information messages printed to log
 2016-05-28: Improved session detection
@@ -130,7 +131,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					if(settings['fuel']['enabled'] and compare_fuel > 0 and compare_fuel > smm.fuel):
 						samples['fuel'].append(compare_fuel - smm.fuel)
 						if(len(samples['fuel']) > 3*settings['fuel']['samples']):
-							samples['fuel'] = samples['fuel'][-3*settings['fuel']['samples']:]
+							samples['fuel'] = samples['fuel'][int(-3*settings['fuel']['samples']):]
 							wn = 0
 							wd = 0
 							for i in xrange(0,len(samples['fuel'])):
