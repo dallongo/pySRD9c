@@ -9,6 +9,8 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-06-26: Allow display up to 9th gear
+	Fix for restarting session not clearing session variables
 2016-05-31: Fix array index type error (float instead of int) for fuel array slicing
 2016-05-30: Weighted moving average used for fuel estimates
 2016-05-29: Information messages printed to log
@@ -40,6 +42,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 		samples = {'fuel':[], 'avg_fuel':None}
 		compare_fuel = 0
 		current_session = []
+		current_phase = 0
 		print_info = True
 		try:
 			rfMapHandle = mmap(fileno=0, length=sizeof(rfShared), tagname=rfMapTag)
@@ -67,7 +70,9 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 			bestSector1Session = 0
 			bestSector2Session = 0
 			if(smm.numVehicles > 0):
-				if([smm.session, smm.trackName, smm.vehicleName] == current_session):
+				if([smm.session, smm.trackName, smm.vehicleName] == current_session and
+					(smm.gamePhase >= current_phase or 
+					(smm.gamePhase == rfGamePhase.greenFlag and current_phase == rfGamePhase.fullCourseYellow))):
 					for d in smm.vehicle:
 						if(d.isPlayer):
 							dd = d
@@ -90,6 +95,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					print_info = True
 			else:
 				current_session = []
+			current_phase = smm.gamePhase
 			if(dd):
 				# used by the blink timers (all things that blink do so in unison)
 				if(time() - blink_time['led'] >= settings['led_blink']['duration']*2):
@@ -108,7 +114,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					if(smm.engineRPM/smm.engineMaxRPM >= settings['rpm']['shift']):
 						status[2] = '1'
 				dash.rpm['value'] = rpm
-				dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
+				dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 10)})[str(smm.gear)]
 				if(settings['speed']['units'] == 'mph'):
 					dash.right = '{0}'.format(int(mps_to_mph(smm.speed)))
 				elif(settings['speed']['units'] == 'km/h'):
@@ -178,7 +184,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					et_max += int(settings['info_text']['remaining']['enabled'])*settings['info_text']['duration']
 					if(et >= et_min and et < et_max and settings['info_text']['remaining']['enabled']):
 						dash.left = 'L{0}'.format(str(dd.totalLaps).rjust(3))
-						if(smm.maxLaps > 0 and smm.maxLaps < 200):
+						if(smm.maxLaps > 0 and smm.maxLaps < 2000):
 							dash.right = ' {0}'.format(str(smm.maxLaps).ljust(3))
 						elif(smm.endET > 0):
 							dash.right = '{0:02.0f}.{1:04.1f}'.format(*divmod(smm.endET - smm.currentET, 60))
@@ -226,7 +232,7 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					if(settings['text_blink']['enabled'] and time() - blink_time['text'] <= settings['text_blink']['duration']):
 						dash.left = 'heat'
 				# blink green status LED while in pit/limiter active
-				if(smm.yellowFlagState == rfYellowFlagState.pitOpen or rfYellowFlagState.pitOpen in smm.sectorFlag):
+				if(smm.yellowFlagState == rfYellowFlagState.pitOpen):
 					status[3] = '1'
 				if(dd.inPits):
 					if(settings['led_blink']['enabled'] and time() - blink_time['led'] <= settings['led_blink']['duration']):
