@@ -6,7 +6,7 @@ Python application that drives a Renovatio SRD-9c display (http://www.renovatio-
 
 ### Usage
 
-For titles based on rFactor 1, copy the included `rFactorSharedMemoryMap.dll` to the sim `Plugins` directory first. Simply plug in the display, double-click `pyDash.exe` to run, and then start R3E or rF1/SCE/AMS. The application requires read and write access in its current working directory for logging and settings file operations. Changes made to the settings file are detected while the application is running - no need to restart. That's it! (Please note that if you run rF1/SCE/AMS as Administrator then you must run `pyDash` as Administrator as well. Administrator privilege is not required otherwise.)
+For titles based on rFactor 1, copy the included `rFactorSharedMemoryMap.dll` to the sim `Plugins` directory first. Simply plug in the display, double-click `pyDash.exe` to run, and then start R3E or rF1/SCE/AMS/FTruck/Marcas. The application requires read and write access in its current working directory for logging and settings file operations. Changes made to the settings file are detected while the application is running - no need to restart. That's it! (Please note that if you run rF1/SCE/AMS/FTruck/Marcas as Administrator then you must run `pyDash` as Administrator as well. Administrator privilege is not required otherwise.)
 
 ### Functions
 
@@ -42,11 +42,11 @@ Configuration changes made on the fly are detected as the application will re-re
 * Lap and sector time comparisons for 'self last lap' will not show if the immediately previous or current lap are invalidated or if the application is restarted during an active session. It will take 2 clean laps in succession to resync the session lap comparison.
 * Sector 3 split times are never shown due to other important information being displayed upon crossing start/finish on each lap.
 * The order of the information displays at the start of each lap cannot be changed (ie, lap time will always be first and laps/time remaining will always be last). This is by design to maintain simplicity in the code.
-* DRS display functions only work with R3E DTM 2013-2016 content. The Push-to-Pass functions have been tested thoroughly with the Audi Sport TT Cup 2015 car. DRS/PTP functions are not available in rF1/SCE/AMS.
+* DRS display functions only work with R3E DTM 2013-2016 content. The Push-to-Pass functions have been tested thoroughly with the Audi Sport TT Cup 2015 car. DRS/PTP functions are not available in rF1/SCE/AMS/FTruck/Marcas.
 
 ### Notes
 
-* Support for rFactor 2 is planned in the near future and should be released sometime in June 2016.
+* Support for rFactor 2 is planned in the near future and should be released sometime in 2016.
 * Plans for a GUI to manage settings will depend on how the merged application will handle rFactor 2.
 * There are currently no plans to support Assetto Corsa, Project CARS, or iRacing since I don't own any of those sims.
 
@@ -62,4 +62,4 @@ Many thanks to the following folks:
 * Sector 3 Studios - for making a great sim and open-sourcing the sample implementation of their shared memory structure
 * 'Mr. Belowski' - for making Crew Chief and helping me out with some of the calculations and structures
 * ISI - for creating rFactor 1 and the gMotor engine
-* Reiza Studios - for making the amazing Stock Car Extreme/Automobilista sims
+* Reiza Studios - for making the amazing Stock Car Extreme/Automobilista/Formula Truck/Copa Petrobras de Marcas sims
