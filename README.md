@@ -16,7 +16,7 @@ The output report is structured as follows (41 bytes total):
 
 Run by itself, `pySRD9c.py` will conduct a self-test on the display.
 
-A sample application providing real-time telemetry data for RaceRoom Racing Experience and rFactor 1/Stock Car Extreme/Automobilista is available in `pyDash.py`. It makes use of the `psutil` module (https://github.com/giampaolo/psutil) to detect which sim is running. 
+A sample application providing real-time telemetry data for RaceRoom Racing Experience and rFactor 1/Stock Car Extreme/Automobilista/Formula Truck/Copa Petrobras de Marcas is available in `pyDash.py`. It makes use of the `psutil` module (https://github.com/giampaolo/psutil) to detect which sim is running. 
 It demonstrates custom mapping of RPM LEDs for use as push-to-pass/DRS indicators as well as warnings that blink the status LEDs during a critical state.
 It also features live lap timing, lap split time, field position, and lap progession during a race.
 The dash configuration is controlled via the `pyDash.settings.json` file (created on start-up if not found, re-read if modified while running).
@@ -24,6 +24,12 @@ The dash configuration is controlled via the `pyDash.settings.json` file (create
 Support for rFactor 1 is provided by the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
 
 ### Releases
+#### 2016-06-26 (v2.0.1.0)
+
+* Allow gear display to go up to 9
+* Fix session restart not clearing session variables
+* Add support for Formula Truck and Copa Petrobras de Marcas
+
 #### 2016-05-31 (v2.0.0.1)
 
 * Fix array index type error (float instead of int) for fuel array slicing
