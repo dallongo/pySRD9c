@@ -9,6 +9,7 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-06-26: Allow display up to 9th gear
 2016-05-31: Fix array index type error (float instead of int) for fuel array slicing
 2016-05-30: Weighted moving average used for fuel estimates and temperature averages
 2016-05-29: Information messages printed to log
@@ -129,7 +130,7 @@ def pyDashR3E(pid, log_print, read_settings, dash):
 					if(smm.engine_rps/smm.max_engine_rps >= settings['rpm']['shift']):
 						status[2] = '1'
 				dash.rpm['value'] = rpm
-				dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 8)})[str(smm.gear)]
+				dash.gear = dict({'-2':'-', '-1':'r', '0':settings['neutral']['symbol']}, **{str(i):str(i) for i in range(1, 10)})[str(smm.gear)]
 				if(settings['speed']['units'] == 'mph'):
 					dash.right = '{0}'.format(int(mps_to_mph(smm.car_speed)))
 				elif(settings['speed']['units'] == 'km/h'):
