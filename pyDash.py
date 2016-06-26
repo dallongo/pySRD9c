@@ -3,6 +3,7 @@ pyDash.py - Waits for sim to launch and then starts appropriate Dash app
 by Dan Allongo (daniel.s.allongo@gmail.com)
 
 Release History:
+2016-06-26: Add support for Formula Truck and Copa Petrobras de Marcas
 2016-05-30: Add multiple instance detection
 2016-05-29: Add timestamp to each log message
 2016-05-28: Clear display after exiting sim
@@ -11,7 +12,7 @@ Release History:
 """
 
 APP_NAME = 'pyDash'
-APP_VER = '2.0.0.1'
+APP_VER = '2.0.1.0'
 APP_DESC = 'Python sim racing dashboard control'
 APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c'
@@ -200,7 +201,7 @@ if __name__ == '__main__':
 		sleep(1)
 		try:
 			for p in process_iter():
-				if(p.name().lower() in ['rrre.exe', 'gsc.exe', 'ams.exe', 'rfactor.exe']):
+				if(p.name().lower() in ['rrre.exe', 'gsc.exe', 'ams.exe', 'rfactor.exe', 'ftruck.exe', 'marcas.exe']):
 					log_print("Found {0}".format(p.name()))
 					if(p.name().lower() == 'rrre.exe'):
 						pyDashR3E(p.pid, log_print, read_settings, dash)
