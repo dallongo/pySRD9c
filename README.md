@@ -24,6 +24,11 @@ The dash configuration is controlled via the `pyDash.settings.json` file (create
 Support for rFactor 1 is provided by the shared memory map plugin available at https://github.com/dallongo/rFactorSharedMemoryMap.
 
 ### Releases
+#### 2016-06-30 (v2.0.1.1)
+
+* Fix 'best' delta showing '0.00' in `pyDashRF1` when setting new best time
+* Add initial invalid lap detection to `pyDashRF1`
+
 #### 2016-06-26 (v2.0.1.0)
 
 * Allow gear display to go up to 9
