@@ -12,7 +12,7 @@ Release History:
 """
 
 APP_NAME = 'pyDash'
-APP_VER = '2.0.1.0'
+APP_VER = '2.0.1.1'
 APP_DESC = 'Python sim racing dashboard control'
 APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c'
