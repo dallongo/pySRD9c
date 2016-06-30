@@ -9,6 +9,8 @@ to display basic telemetry and status data on the dashboard.
 It uses mmap to read from a shared memory handle.
 
 Release History:
+2016-06-30: Fix display of timing gap for self best lap and self best sector
+	Preliminary support for deleted laps
 2016-06-26: Allow display up to 9th gear
 	Fix for restarting session not clearing session variables
 2016-05-31: Fix array index type error (float instead of int) for fuel array slicing
@@ -44,6 +46,12 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 		current_session = []
 		current_phase = 0
 		print_info = True
+		bestLapTime = 0
+		bestSector1 = 0
+		bestSector2 = 0
+		bestLapTimeSession = 0
+		bestSector1Session = 0
+		bestSector2Session = 0
 		try:
 			rfMapHandle = mmap(fileno=0, length=sizeof(rfShared), tagname=rfMapTag)
 		except:
@@ -66,9 +74,6 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 			smm = rfShared.from_buffer_copy(rfMapHandle)
 			# get driver data
 			dd = None
-			bestLapTimeSession = 0
-			bestSector1Session = 0
-			bestSector2Session = 0
 			if(smm.numVehicles > 0):
 				if([smm.session, smm.trackName, smm.vehicleName] == current_session and
 					(smm.gamePhase >= current_phase or 
@@ -76,12 +81,6 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					for d in smm.vehicle:
 						if(d.isPlayer):
 							dd = d
-						if(d.bestLapTime > 0 and (bestLapTimeSession == 0 or d.bestLapTime < bestLapTimeSession)):
-							bestLapTimeSession = d.bestLapTime
-						if(d.bestSector1 > 0 and (bestSector1Session == 0 or d.bestSector1 < bestSector1Session)):
-							bestSector1Session = d.bestSector1
-						if(d.bestSector2 > 0 and (bestSector2Session == 0 or d.bestSector2 < bestSector2Session)):
-							bestSector2Session = d.bestSector2
 				else:
 					log_print("New session detected!")
 					# clear session variables on exiting session
@@ -93,6 +92,12 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 					compare_fuel = 0
 					current_session = [smm.session, smm.trackName, smm.vehicleName]
 					print_info = True
+					bestLapTime = 0
+					bestSector1 = 0
+					bestSector2 = 0
+					bestLapTimeSession = 0
+					bestSector1Session = 0
+					bestSector2Session = 0
 			else:
 				current_session = []
 			current_phase = smm.gamePhase
@@ -122,6 +127,9 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 				if(smm.currentET > 0 and smm.lapStartET > 0 and smm.lapNumber > 0):
 					currentLapTime = smm.currentET - smm.lapStartET
 				else:
+					currentLapTime = 0
+				# attempt to detect invalid lap time
+				if((dd.sector == 2 and dd.curSector1 < 0) or (dd.sector == 0 and dd.curSector2 < 0)):
 					currentLapTime = 0
 				# no running clock on invalid/out laps
 				if(currentLapTime > 0):
@@ -192,27 +200,42 @@ def pyDashRF1(pid, log_print, read_settings, dash):
 							dash.right = ' '*4
 				elif(current_sector in [2, 0] and settings['info_text']['sector_split']['enabled'] and time() - info_text_time <= settings['info_text']['duration']):
 					# show sectors 1 and 2 splits
-					if(dd.lastSector1 > 0 and dd.lastSector2 > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_previous'):
-						compare_sector = dd.lastSector1
-						if(current_sector == 0):
+					compare_sector = 0
+					if(settings['info_text']['sector_split']['compare_lap'] == 'self_previous'):
+						if(current_sector == 2 and dd.lastSector1 > 0):
+							compare_sector = dd.lastSector1
+						elif(current_sector == 0 and dd.lastSector1 > 0 and dd.lastSector2 > 0):
 							compare_sector = dd.lastSector2 - dd.lastSector1
-					elif(dd.bestSector1 > 0 and dd.bestSector2 > 0 and settings['info_text']['sector_split']['compare_lap'] == 'self_best'):
-						compare_sector = dd.bestSector1
-						if(current_sector == 0):
-							compare_sector = dd.bestSector2 - dd.bestSector1
-					elif(bestSector1Session > 0 and bestSector2Session > 0 and settings['info_text']['sector_split']['compare_lap'] == 'session_best'):
-						compare_sector = bestSector1Session
-						if(current_sector == 0):
+					elif(settings['info_text']['sector_split']['compare_lap'] == 'self_best'):
+						if(current_sector == 2 and bestSector1 > 0):
+							compare_sector = bestSector1
+						elif(current_sector == 0 and bestSector1 > 0 and bestSector2 > 0):
+							compare_sector = bestSector2 - bestSector1
+					elif(settings['info_text']['sector_split']['compare_lap'] == 'session_best'):
+						if(current_sector == 2 and bestSector1Session > 0):
+							compare_sector = bestSector1Session
+						elif(current_sector == 0 and bestSector1Session > 0 and bestSector2Session > 0):
 							compare_sector = bestSector2Session - bestSector1Session
-					else:
-						compare_sector = 0
-					if(compare_sector > 0 and currentLapTime > 0):
+					if(compare_sector > 0 and current_sector == 2 and currentLapTime > 0 and dd.curSector1 > 0):
 						sector_delta = dd.curSector1 - compare_sector
-						if(current_sector == 0):
-							sector_delta = (dd.curSector2 - dd.curSector1) - compare_sector
+						dash.right = '{0:04.2f}'.format(sector_delta)
+					elif(compare_sector > 0 and current_sector == 0 and currentLapTime > 0 and dd.curSector1 > 0 and dd.curSector2 > 0):
+						sector_delta = (dd.curSector2 - dd.curSector1) - compare_sector
 						dash.right = '{0:04.2f}'.format(sector_delta)
 					else:
 						dash.right = '--.--'
+				else:
+					# update best sectors after delta display to avoid displaying '0.00' when setting new best
+					bestLapTime = dd.bestLapTime
+					bestSector1 = dd.bestSector1
+					bestSector2 = dd.bestSector2
+					for d in smm.vehicle:
+						if(d.bestLapTime > 0 and (bestLapTimeSession == 0 or d.bestLapTime < bestLapTimeSession)):
+							bestLapTimeSession = d.bestLapTime
+						if(d.bestSector1 > 0 and (bestSector1Session == 0 or d.bestSector1 < bestSector1Session)):
+							bestSector1Session = d.bestSector1
+						if(d.bestSector2 > 0 and (bestSector2Session == 0 or d.bestSector2 < bestSector2Session)):
+							bestSector2Session = d.bestSector2
 				# blink red status LED at critical fuel level
 				if(settings['fuel']['enabled'] and samples['avg_fuel'] > 0 and smm.fuel/samples['avg_fuel'] <= settings['fuel']['warning']):
 					status[0] = '1'
