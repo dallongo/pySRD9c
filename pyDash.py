@@ -3,6 +3,7 @@ pyDash.py - Waits for sim to launch and then starts appropriate Dash app
 by Dan Allongo (daniel.s.allongo@gmail.com)
 
 Release History:
+2016-07-06: Add support for Assetto Corsa
 2016-06-26: Add support for Formula Truck and Copa Petrobras de Marcas
 2016-05-30: Add multiple instance detection
 2016-05-29: Add timestamp to each log message
@@ -12,7 +13,7 @@ Release History:
 """
 
 APP_NAME = 'pyDash'
-APP_VER = '2.0.1.1'
+APP_VER = '2.1.0.0'
 APP_DESC = 'Python sim racing dashboard control'
 APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c'
@@ -20,6 +21,7 @@ APP_URL = 'https://github.com/dallongo/pySRD9c'
 if __name__ == '__main__':
 	from pyDashR3E import pyDashR3E
 	from pyDashRF1 import pyDashRF1
+	from pyDashAC import pyDashAC
 	from pySRD9c import srd9c
 
 	from time import sleep
@@ -197,16 +199,22 @@ if __name__ == '__main__':
 	log_print("Waiting for SRD-9c...")
 	dash = srd9c()
 	log_print("Connected!")
+	r3e_exe = ['rrre.exe']
+	rf1_exe = ['gsc.exe', 'ams.exe', 'rfactor.exe', 'ftruck.exe', 'marcas.exe']
+	ac_exe = ['assettocorsa.exe']
+	all_exe = r3e_exe + rf1_exe + ac_exe
 	while(True):
 		sleep(1)
 		try:
 			for p in process_iter():
-				if(p.name().lower() in ['rrre.exe', 'gsc.exe', 'ams.exe', 'rfactor.exe', 'ftruck.exe', 'marcas.exe']):
+				if(p.name().lower() in all_exe):
 					log_print("Found {0}".format(p.name()))
-					if(p.name().lower() == 'rrre.exe'):
+					if(p.name().lower() in r3e_exe):
 						pyDashR3E(p.pid, log_print, read_settings, dash)
-					else:
+					elif(p.name().lower() in rf1_exe):
 						pyDashRF1(p.pid, log_print, read_settings, dash)
+					elif(p.name().lower() in ac_exe):
+						pyDashAC(p.pid, log_print, read_settings, dash)
 					# clear display after exiting sim
 					dash.gear = ' '
 					dash.left = ' '*4
