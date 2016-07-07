@@ -3,7 +3,7 @@ pyAC.py - Defines the shared memory map structures for Assetto Corsa
 by Dan Allongo (daniel.s.allongo@gmail.com)
 
 Release History:
-2016-07-05: Initial release
+2016-07-06: Initial release
 """
 
 from ctypes import *
@@ -139,8 +139,8 @@ class acStatic(acStruct):
 				('aidAutoClutch', c_int), 
 				('aidAutoBlip', c_int)]
 
-def kph_to_mph(m):
-	return (m * 1.60934)
+def kph_to_mph(k):
+	return (k / 1.60934)
 
 def mps_to_kph(m):
 	return (m * 3.6)
