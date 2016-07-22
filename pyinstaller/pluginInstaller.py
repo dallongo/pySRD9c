@@ -16,6 +16,8 @@ from subprocess import check_output
 
 plugin_dll = "rFactorSharedMemoryMap.dll"
 github_api_url = 'https://api.github.com/repos/dallongo/rFactorSharedMemoryMap/releases'
+steam_app_id = '431600'
+steam_app_id_file = 'steam_appid.txt'
 
 APP_NAME = 'pluginInstaller'
 APP_VER = '1.0.0.0'
@@ -24,18 +26,12 @@ APP_AUTHOR = 'Dan Allongo (daniel.s.allongo@gmail.com)'
 APP_URL = 'https://github.com/dallongo/pySRD9c/pyinstaller'
 
 def is_admin():
-  if os.name != 'nt':
-    raise RuntimeError, "This program is for Windows only"
   try:
     return ctypes.windll.shell32.IsUserAnAdmin()
   except:
-    traceback.print_exc()
     return False
 
 def run_as_admin():
-  if os.name != 'nt':
-    raise RuntimeError, "This program is for Windows only"
-  
   procInfo = ShellExecuteEx(nShow=win32con.SW_SHOWNORMAL,
                             fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
                             lpVerb='runas',
@@ -52,22 +48,12 @@ if __name__ == "__main__":
   print APP_URL
   print
 
+  if os.name != 'nt':
+    raise RuntimeError, "This program is for Windows only"
+
   if not is_admin():
     print "This program requires administrator privileges"
     sys.exit(run_as_admin())
-  try:
-    ams_install_path = check_output('reg query HKLM\\Software /s /f "Steam App 431600" /v InstallLocation /k /e /t REG_SZ /c', shell=True).split('REG_SZ    ')[1].split('\r\n')[0] + '\\Plugins'
-  except:
-    traceback.print_exc()
-    print "Unable to locate Automobilista install path!"
-    os.system('pause')
-    sys.exit(1)
-  if os.path.exists(ams_install_path):
-    print "Found Automobilista plugin path in {0}".format(ams_install_path)
-  else:
-    print "Unable to locate Automobilista plugin path!"
-    os.system('pause')
-    sys.exit(1)
   print "Finding latest release in {0}".format(github_api_url)
   r = requests.get(github_api_url)
   if r.status_code != 200:
@@ -103,6 +89,30 @@ if __name__ == "__main__":
     os.system('pause')
     sys.exit(1)
   print "Successfully downloaded {0}".format(plugin_dll)
+  print "Searching registry for Automobilista install path..."
+  try:
+    ams_install_path = os.path.join(check_output('reg query HKLM\\Software /s /f "Steam App {0}" /v InstallLocation /k /e /t REG_SZ /c'.format(steam_app_id), shell=True).split('REG_SZ    ')[1].split('\r\n')[0],'Plugins')
+  except:
+    print "Searching disks for Automobilista install path..."
+    for drive in win32api.GetLogicalDriveStrings().split('\x00')[1::-1]:
+      for root,path,files in os.walk(drive):
+        head, tail = os.path.split(root)
+        if tail == 'Automobilista' and 'AMS.exe' in files and steam_app_id_file in files:
+          with open(os.path.join(root,steam_app_id_file),'r') as f:
+            app_id = f.read()
+          if app_id == steam_app_id:
+            ams_install_path = os.path.join(root,'Plugins')
+            break
+    if not ams_install_path:
+      print "Unable to locate Automobilista install path!"
+      os.system('pause')
+      sys.exit(1)
+  if os.path.exists(ams_install_path):
+    print "Found Automobilista plugin path in {0}".format(ams_install_path)
+  else:
+    print "Unable to locate Automobilista plugin path, please copy {0} manually to Plugins folder.".format(plugin_dll)
+    os.system('pause')
+    sys.exit(1)
   try:
     shutil.copy(plugin_dll, ams_install_path)
     print "{0} successfully copied to {1}".format(plugin_dll, ams_install_path)
